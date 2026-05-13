@@ -200,7 +200,7 @@ export default function Proxies() {
     try {
       await api.updateProxy(editingProxy.id, {
         url: trimmedUrl,
-        label: editLabel.trim() || undefined,
+        label: editLabel.trim(),
       });
       setEditingProxy(null);
       await reload();

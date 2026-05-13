@@ -203,7 +203,13 @@ func pruneDeletedGroupFromAPIKeyScopes(ctx context.Context, tx *sql.Tx, sqlite b
 		if !containsInt64(groups, groupID) {
 			continue
 		}
-		updates = append(updates, update{id: id, groups: removeInt64(groups, groupID)})
+		nextGroups := removeInt64(groups, groupID)
+		// If the deleted group was the key's only allowed group, keep the stale
+		// ID instead of broadening the key into an unrestricted key.
+		if len(nextGroups) == 0 && len(groups) > 0 {
+			continue
+		}
+		updates = append(updates, update{id: id, groups: nextGroups})
 	}
 	if err := rows.Err(); err != nil {
 		return err

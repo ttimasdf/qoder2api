@@ -21,8 +21,9 @@ import { useToast } from "../hooks/useToast";
 import { CodeBlock, EndpointDoc } from "./docs/EndpointDoc";
 import DocsTOC, { type DocsTOCItem } from "./docs/DocsTOC";
 import {
-  QUICK_TOOLS,
+  buildQuickTools,
   resolveTemplate,
+  type DocsLocale,
   type QuickTool,
 } from "./docs/quickStartTools";
 import {
@@ -585,9 +586,13 @@ function SectionHeader({
 }
 
 export default function Docs() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const baseUrl = useMemo(() => window.location.origin, []);
   const adminSeed = useMemo(() => getAdminKey(), []);
+  const docsLocale = useMemo<DocsLocale>(
+    () => ((i18n.language || "zh").startsWith("zh") ? "zh" : "en"),
+    [i18n.language],
+  );
   const [quickBaseUrl, setQuickBaseUrl] = useState(baseUrl);
   const [codexOs, setCodexOs] = useState<"unix" | "windows">("unix");
   const [claudeOs, setClaudeOs] = useState<"unix" | "windows">("unix");
@@ -691,6 +696,7 @@ export default function Docs() {
   }, [mappedClaudeModels, models]);
   const ccSwitchModelOptions =
     ccSwitchApp === "claude" ? claudeModelOptions : modelOptions;
+  const quickTools = useMemo(() => buildQuickTools(docsLocale), [docsLocale]);
   const ccSwitchConfig = CC_SWITCH_APPS[ccSwitchApp];
   const siteName = settings?.site_name?.trim() || "CodexProxy";
   const defaultCcSwitchName = `${siteName} ${ccSwitchConfig.suffix}`;
@@ -776,8 +782,14 @@ export default function Docs() {
     siteName,
   ]);
 
-  const modelEndpoints = useMemo(() => buildEndpointSpecs(baseUrl), [baseUrl]);
-  const adminEndpoints = useMemo(() => buildAdminSpecs(baseUrl), [baseUrl]);
+  const modelEndpoints = useMemo(
+    () => buildEndpointSpecs(baseUrl, docsLocale),
+    [baseUrl, docsLocale],
+  );
+  const adminEndpoints = useMemo(
+    () => buildAdminSpecs(baseUrl, docsLocale),
+    [baseUrl, docsLocale],
+  );
 
   const tocItems: DocsTOCItem[] = useMemo(
     () => [
@@ -827,9 +839,10 @@ export default function Docs() {
   const handleCopyMarkdown = async () => {
     setCopyingMd(true);
     const md = buildDocsMarkdown({
-      baseUrl,
-      quickTools: QUICK_TOOLS,
+      baseUrl: quickBaseUrl,
+      quickTools,
       apiKeyExample: firstKey || "YOUR_API_KEY",
+      locale: docsLocale,
     });
     try {
       await navigator.clipboard.writeText(md);

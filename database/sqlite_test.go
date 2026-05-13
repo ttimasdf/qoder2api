@@ -551,6 +551,64 @@ func TestSQLiteUsageStatsBaselineHasBillingColumns(t *testing.T) {
 	}
 }
 
+func TestDeleteAccountGroupDoesNotBroadenScopedAPIKey(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "codex2api.db")
+
+	db, err := New("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("New(sqlite) 返回错误: %v", err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	groupA, err := db.CreateAccountGroup(ctx, "Group A", "", "#2563eb", 0)
+	if err != nil {
+		t.Fatalf("CreateAccountGroup A 返回错误: %v", err)
+	}
+	groupB, err := db.CreateAccountGroup(ctx, "Group B", "", "#16a34a", 1)
+	if err != nil {
+		t.Fatalf("CreateAccountGroup B 返回错误: %v", err)
+	}
+
+	keyOnlyA, err := db.InsertAPIKeyWithOptions(ctx, APIKeyInput{
+		Name:            "Only A",
+		Key:             "sk-only-a-1234567890",
+		AllowedGroupIDs: []int64{groupA},
+	})
+	if err != nil {
+		t.Fatalf("InsertAPIKeyWithOptions only-a 返回错误: %v", err)
+	}
+	keyAB, err := db.InsertAPIKeyWithOptions(ctx, APIKeyInput{
+		Name:            "A and B",
+		Key:             "sk-a-b-1234567890",
+		AllowedGroupIDs: []int64{groupA, groupB},
+	})
+	if err != nil {
+		t.Fatalf("InsertAPIKeyWithOptions a-b 返回错误: %v", err)
+	}
+
+	if err := db.DeleteAccountGroup(ctx, groupA, true); err != nil {
+		t.Fatalf("DeleteAccountGroup 返回错误: %v", err)
+	}
+
+	rows, err := db.ListAPIKeys(ctx)
+	if err != nil {
+		t.Fatalf("ListAPIKeys 返回错误: %v", err)
+	}
+
+	got := make(map[int64][]int64)
+	for _, row := range rows {
+		got[row.ID] = row.AllowedGroupIDs
+	}
+
+	if actual := got[keyOnlyA]; len(actual) != 1 || actual[0] != groupA {
+		t.Fatalf("keyOnlyA allowed groups = %v, want stale [%d] to preserve deny-all semantics", actual, groupA)
+	}
+	if actual := got[keyAB]; len(actual) != 1 || actual[0] != groupB {
+		t.Fatalf("keyAB allowed groups = %v, want [%d]", actual, groupB)
+	}
+}
+
 func TestUsageLogsPersistEffectiveModel(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "codex2api.db")
 
