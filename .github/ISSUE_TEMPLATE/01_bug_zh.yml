@@ -1,0 +1,59 @@
+name: 遇到问题 / 报错
+description: 网关报错、调度异常、统计不准、UI 卡住、Docker 起不来……都从这里提
+title: "[Bug] "
+labels: ["type/bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。贴日志或配置时，请把 **Refresh Token / Access Token / API Key / Cookie** 打码再发。
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 哪块出了问题？
+      options:
+        - 网关 API（/v1/chat/completions、/responses、/messages、Images）
+        - 账号池 / 调度 / 健康度 / 冷却恢复
+        - 用量统计 / 计费 / API Key
+        - 管理后台 UI（React 控制台）
+        - 部署 / Docker / 环境变量 / 数据库
+        - 其他 / 不太确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 出了什么状况？
+      description: 大概描述一下现象就行，能附上报错信息或截图更好。
+      placeholder: |
+        例如：调用 /v1/chat/completions 时返回 502，后台日志里看到 "no available account"……
+    validations:
+      required: true
+
+  - type: textarea
+    id: how-to-trigger
+    attributes:
+      label: 怎么触发的？（可选）
+      description: 不用很严格，"大概这样操作就出现了"也可以。
+      placeholder: |
+        1. 用 Codex CLI 连上网关
+        2. 连续发了几条消息
+        3. 第 3 条开始 502
+
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境信息（可选，能填就填）
+      value: |
+        - 部署形态：PG+Redis / SQLite+Memory / 源码 / 其他
+        - 版本或 commit：
+        - 客户端：Codex CLI / Claude Code / OpenAI SDK / 其他
+        - 浏览器（前端问题填）：
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息（可选）
+      description: 想到什么写什么，比如怀疑是哪里的问题、试过什么解决方法。

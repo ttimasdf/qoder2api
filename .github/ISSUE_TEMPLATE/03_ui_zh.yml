@@ -1,0 +1,33 @@
+name: 管理后台体验反馈
+description: 控制台 UI / 交互 / 视觉相关问题——截图比文字更有说服力
+title: "[UI] "
+labels: ["type/ui", "area/frontend"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        前端问题强烈建议附上 **截图或录屏**，一图胜千言。
+
+  - type: textarea
+    id: detail
+    attributes:
+      label: 你看到了什么 / 想优化什么？
+      description: 哪个页面、哪个组件、什么场景下出现的。
+      placeholder: |
+        例如：账号列表页在窄屏下表格列被挤变形；
+        图表的颜色对比度太低看不清；
+        某个按钮的 hover 状态很奇怪……
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: 涉及的页面（可选）
+      placeholder: 如 /admin/accounts、/admin/usage、Image Studio……
+
+  - type: textarea
+    id: env
+    attributes:
+      label: 浏览器 / 屏幕信息（可选）
+      placeholder: 如 Chrome 130 / macOS / 1920×1080；或手机 Safari 等。

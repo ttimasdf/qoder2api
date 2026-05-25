@@ -1,0 +1,52 @@
+name: Bug Report (English)
+description: Something broke — gateway error, scheduler issue, UI glitch, deploy failure, etc.
+title: "[Bug] "
+labels: ["type/bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please redact **Refresh Tokens / Access Tokens / API keys / cookies** before pasting logs or configs.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area is affected?
+      options:
+        - Gateway API (/v1/chat/completions, /responses, /messages, Images)
+        - Account pool / scheduler / health / cooldown
+        - Usage tracking / billing / API keys
+        - Admin dashboard UI (React)
+        - Deploy / Docker / env / database
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What went wrong?
+      description: A short description is fine. Logs or screenshots help a lot.
+    validations:
+      required: true
+
+  - type: textarea
+    id: how-to-trigger
+    attributes:
+      label: How to reproduce? (optional)
+      description: Rough steps are fine — no need to be exact.
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment (optional, fill what you know)
+      value: |
+        - Deploy shape: PG+Redis / SQLite+Memory / source / other
+        - Version or commit:
+        - Client: Codex CLI / Claude Code / OpenAI SDK / other
+        - Browser (for UI issues):
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else? (optional)

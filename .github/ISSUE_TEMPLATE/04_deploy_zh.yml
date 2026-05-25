@@ -1,0 +1,40 @@
+name: 部署 / 配置求助
+description: Docker 起不来、环境变量不知道怎么填、SQLite/PG 切换、deploy.sh 报错……
+title: "[Deploy] "
+labels: ["type/help", "area/deploy"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        贴 docker-compose / env 时记得把 **密码、Token、API Key** 打码。
+
+  - type: dropdown
+    id: shape
+    attributes:
+      label: 你用的部署形态？
+      options:
+        - Docker Compose（PostgreSQL + Redis）
+        - Docker Compose（SQLite + Memory）
+        - 源码直接运行
+        - deploy.sh 脚本
+        - Render / 其他云平台
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: trouble
+    attributes:
+      label: 卡在哪一步 / 报了什么错？
+      description: 尽量贴上启动日志的报错段落，比凭印象描述准。
+      placeholder: |
+        例如：执行 docker compose up 后，codex2api 容器一直重启，
+        日志里反复出现 "failed to connect to redis"……
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 试过什么解决办法？（可选）
+      placeholder: 比如改过哪些环境变量、查过哪些文档。
