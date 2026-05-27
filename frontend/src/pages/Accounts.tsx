@@ -410,6 +410,11 @@ export default function Accounts() {
   const [operationProgress, setOperationProgress] =
     useState<OperationProgressState | null>(null);
   const operationProgressHideTimer = useRef<number | null>(null);
+  const operationProgressFrame = useRef<number | null>(null);
+  const pendingOperationProgress = useRef<{
+    title: string;
+    event: BatchOperationEvent;
+  } | null>(null);
   const [lockingSubscriptionAccounts, setLockingSubscriptionAccounts] =
     useState(false);
   const [cleaningBanned, setCleaningBanned] = useState(false);
@@ -538,6 +543,10 @@ export default function Accounts() {
       if (operationProgressHideTimer.current !== null) {
         window.clearTimeout(operationProgressHideTimer.current);
       }
+      if (operationProgressFrame.current !== null) {
+        window.cancelAnimationFrame(operationProgressFrame.current);
+      }
+      pendingOperationProgress.current = null;
     };
   }, []);
 
@@ -559,12 +568,8 @@ export default function Accounts() {
     }, 5000);
   }, []);
 
-  const applyOperationProgressEvent = useCallback(
+  const commitOperationProgressEvent = useCallback(
     (title: string, event: BatchOperationEvent) => {
-      if (operationProgressHideTimer.current !== null) {
-        window.clearTimeout(operationProgressHideTimer.current);
-        operationProgressHideTimer.current = null;
-      }
       setOperationProgress((prev) => ({
         show: true,
         action: event.action,
@@ -584,6 +589,41 @@ export default function Accounts() {
       }
     },
     [scheduleOperationProgressClose],
+  );
+
+  const flushOperationProgressEvent = useCallback(() => {
+    operationProgressFrame.current = null;
+    const pending = pendingOperationProgress.current;
+    if (!pending) return;
+    pendingOperationProgress.current = null;
+    commitOperationProgressEvent(pending.title, pending.event);
+  }, [commitOperationProgressEvent]);
+
+  const applyOperationProgressEvent = useCallback(
+    (title: string, event: BatchOperationEvent) => {
+      if (operationProgressHideTimer.current !== null) {
+        window.clearTimeout(operationProgressHideTimer.current);
+        operationProgressHideTimer.current = null;
+      }
+
+      pendingOperationProgress.current = { title, event };
+
+      if (event.type === "complete") {
+        if (operationProgressFrame.current !== null) {
+          window.cancelAnimationFrame(operationProgressFrame.current);
+          operationProgressFrame.current = null;
+        }
+        flushOperationProgressEvent();
+        return;
+      }
+
+      if (operationProgressFrame.current === null) {
+        operationProgressFrame.current = window.requestAnimationFrame(
+          flushOperationProgressEvent,
+        );
+      }
+    },
+    [flushOperationProgressEvent],
   );
 
   const runStreamingAccountOperation = useCallback(

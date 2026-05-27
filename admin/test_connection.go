@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -19,6 +20,8 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
+
+var batchTestAccountTimeout = 30 * time.Second
 
 // testEvent SSE 测试事件
 type testEvent struct {
@@ -679,6 +682,9 @@ func (h *Handler) emitBatchTestProgress(
 }
 
 func (h *Handler) runSingleBatchTest(ctx context.Context, acc *auth.Account) (string, string) {
+	testCtx, cancel := context.WithTimeout(ctx, batchTestAccountTimeout)
+	defer cancel()
+
 	if !acc.IsOpenAIResponsesAPI() && acc.GetAccessToken() == "" {
 		acc.Mu().RLock()
 		hasRefreshToken := acc.RefreshToken != ""
@@ -689,8 +695,11 @@ func (h *Handler) runSingleBatchTest(ctx context.Context, acc *auth.Account) (st
 		return "failed", "账号缺少 access_token 和 refresh_token"
 	}
 
-	testModel, modelErr := h.connectionTestModelForAccount(ctx, acc, "")
+	testModel, modelErr := h.connectionTestModelForAccount(testCtx, acc, "")
 	if modelErr != nil {
+		if msg, ok := batchTestContextFailure(testCtx, modelErr); ok {
+			return "failed", msg
+		}
 		h.store.MarkError(acc, "批量测试失败: "+modelErr.Error())
 		return "failed", modelErr.Error()
 	}
@@ -699,17 +708,29 @@ func (h *Handler) runSingleBatchTest(ctx context.Context, acc *auth.Account) (st
 	var resp *http.Response
 	var err error
 	if acc.IsOpenAIResponsesAPI() {
-		resp, err = proxy.ExecuteOpenAIResponsesRequest(ctx, acc, payload, h.store.ResolveProxyForAccount(acc), nil)
+		resp, err = proxy.ExecuteOpenAIResponsesRequest(testCtx, acc, payload, h.store.ResolveProxyForAccount(acc), nil)
 	} else {
-		resp, err = proxy.ExecuteRequest(ctx, acc, payload, "", h.store.ResolveProxyForAccount(acc), "", nil, nil)
+		resp, err = proxy.ExecuteRequest(testCtx, acc, payload, "", h.store.ResolveProxyForAccount(acc), "", nil, nil)
 	}
 	if err != nil {
+		if msg, ok := batchTestContextFailure(testCtx, err); ok {
+			if errors.Is(testCtx.Err(), context.DeadlineExceeded) {
+				h.store.ReportRequestFailure(acc, "timeout", batchTestAccountTimeout)
+			}
+			return "failed", msg
+		}
 		h.store.MarkError(acc, "批量测试请求失败: "+err.Error())
 		return "failed", err.Error()
 	}
 	defer resp.Body.Close()
 	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
+		if msg, ok := batchTestContextFailure(testCtx, readErr); ok {
+			if errors.Is(testCtx.Err(), context.DeadlineExceeded) {
+				h.store.ReportRequestFailure(acc, "timeout", batchTestAccountTimeout)
+			}
+			return "failed", msg
+		}
 		h.store.MarkError(acc, "批量测试读取响应失败: "+readErr.Error())
 		return "failed", readErr.Error()
 	}
@@ -749,6 +770,16 @@ func (h *Handler) runSingleBatchTest(ctx context.Context, acc *auth.Account) (st
 		}
 		return "failed", msg
 	}
+}
+
+func batchTestContextFailure(ctx context.Context, err error) (string, bool) {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Sprintf("测试超时: %s 内未完成", batchTestAccountTimeout), true
+	}
+	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
+		return "测试已取消", true
+	}
+	return "", false
 }
 
 func shouldMarkBatchTestAccountError(statusCode int, body []byte) bool {
