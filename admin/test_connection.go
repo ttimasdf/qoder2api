@@ -22,6 +22,7 @@ import (
 )
 
 var batchTestAccountTimeout = 30 * time.Second
+var batchTestWhamTimeout = 5 * time.Second
 
 // testEvent SSE 测试事件
 type testEvent struct {
@@ -226,7 +227,7 @@ func buildTestPayload(model string) []byte {
 			"content": []map[string]any{
 				{
 					"type": "input_text",
-					"text": "Say hello in one sentence.",
+					"text": "hi",
 				},
 			},
 		},
@@ -696,6 +697,10 @@ func (h *Handler) runSingleBatchTest(ctx context.Context, acc *auth.Account) (st
 		return "failed", "账号缺少 access_token 和 refresh_token"
 	}
 
+	if status, msg, done := h.batchTestWhamPreflight(testCtx, acc); done {
+		return status, msg
+	}
+
 	testModel, modelErr := h.connectionTestModelForAccount(testCtx, acc, "")
 	if modelErr != nil {
 		if msg, ok := batchTestContextFailure(testCtx, modelErr); ok {
@@ -725,17 +730,6 @@ func (h *Handler) runSingleBatchTest(ctx context.Context, acc *auth.Account) (st
 		return "failed", err.Error()
 	}
 	defer resp.Body.Close()
-	body, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
-		if msg, ok := batchTestContextFailure(testCtx, readErr); ok {
-			if errors.Is(testCtx.Err(), context.DeadlineExceeded) {
-				h.store.ReportRequestFailure(acc, "timeout", batchTestAccountTimeout)
-			}
-			return "failed", msg
-		}
-		h.store.MarkError(acc, "批量测试读取响应失败: "+readErr.Error())
-		return "failed", readErr.Error()
-	}
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -744,20 +738,36 @@ func (h *Handler) runSingleBatchTest(ctx context.Context, acc *auth.Account) (st
 			if msg, limited := formatUsageLimitedTestError(usageState); limited {
 				return "rate_limited", msg
 			}
-			if !usageState.HasUsage7d && !usageState.HasUsage5h {
-				acc.ClearUsageCache()
+		}
+		status, msg := h.readBatchTestStreamResult(testCtx, acc, resp, testModel)
+		if status != "success" {
+			return status, msg
+		}
+		if !acc.IsOpenAIResponsesAPI() {
+			if _, hasUsage7d := acc.GetUsagePercent7d(); !hasUsage7d {
+				if _, _, hasUsage5h := acc.GetUsageSnapshot5h(); !hasUsage5h {
+					acc.ClearUsageCache()
+				}
 			}
 		}
 		// 测试成功即重置失败/冷却状态，用量限制由调度器自行判断
 		h.store.RecordManualTestSuccess(acc, time.Since(start))
-		return "success", "测试通过"
+		return "success", msg
 	case http.StatusUnauthorized:
+		body, readErr := readBatchTestErrorBody(testCtx, resp.Body)
+		if readErr != nil {
+			return h.handleBatchTestReadError(testCtx, acc, readErr)
+		}
 		if !acc.IsOpenAIResponsesAPI() {
 			proxy.SyncCodexUsageState(h.store, acc, resp)
 		}
 		h.store.MarkCooldownWithError(acc, 24*time.Hour, "unauthorized", fmt.Sprintf("上游返回 %d: %s", resp.StatusCode, truncate(string(body), 300)))
 		return "banned", "账号授权失败"
 	case http.StatusTooManyRequests:
+		body, readErr := readBatchTestErrorBody(testCtx, resp.Body)
+		if readErr != nil {
+			return h.handleBatchTestReadError(testCtx, acc, readErr)
+		}
 		if acc.IsOpenAIResponsesAPI() {
 			h.store.MarkCooldown(acc, time.Minute, "rate_limited")
 		} else {
@@ -766,12 +776,148 @@ func (h *Handler) runSingleBatchTest(ctx context.Context, acc *auth.Account) (st
 		}
 		return "rate_limited", "账号触发 429 限流"
 	default:
+		body, readErr := readBatchTestErrorBody(testCtx, resp.Body)
+		if readErr != nil {
+			return h.handleBatchTestReadError(testCtx, acc, readErr)
+		}
 		msg := fmt.Sprintf("上游返回 %d: %s", resp.StatusCode, truncate(string(body), 300))
 		if shouldMarkBatchTestAccountError(resp.StatusCode, body) {
 			h.store.MarkError(acc, "批量测试"+msg)
 		}
 		return "failed", msg
 	}
+}
+
+func (h *Handler) batchTestWhamPreflight(ctx context.Context, acc *auth.Account) (string, string, bool) {
+	if h == nil || h.store == nil || acc == nil || acc.IsOpenAIResponsesAPI() || acc.GetAccessToken() == "" {
+		return "", "", false
+	}
+
+	whamCtx, cancel := context.WithTimeout(ctx, batchTestWhamTimeout)
+	defer cancel()
+
+	usage, resp, err := proxy.QueryWhamUsage(whamCtx, acc, h.store.ResolveProxyForAccount(acc))
+	if resp != nil && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		_ = resp.Body.Close()
+		switch resp.StatusCode {
+		case http.StatusUnauthorized:
+			msg := fmt.Sprintf("WHAM 用量探针返回 %d: %s", resp.StatusCode, truncate(string(body), 300))
+			h.store.MarkCooldownWithError(acc, 24*time.Hour, "unauthorized", msg)
+			return "banned", msg, true
+		default:
+			if shouldMarkUsageProbeAccountError(resp.StatusCode, body) {
+				msg := fmt.Sprintf("WHAM 用量探针返回 %d: %s", resp.StatusCode, truncate(string(body), 300))
+				h.store.MarkError(acc, msg)
+				return "failed", msg, true
+			}
+		}
+	}
+	if err != nil || usage == nil {
+		return "", "", false
+	}
+
+	usageState := proxy.ApplyWhamUsage(h.store, acc, usage)
+	if msg, limited := formatUsageLimitedTestError(usageState); limited {
+		return "rate_limited", msg, true
+	}
+	return "", "", false
+}
+
+func (h *Handler) readBatchTestStreamResult(ctx context.Context, acc *auth.Account, resp *http.Response, model string) (string, string) {
+	hasContent := false
+	gotTerminal := false
+	resultStatus := ""
+	resultMessage := ""
+	var lastUpstreamEvent []byte
+
+	readErr := proxy.ReadSSEStream(resp.Body, func(data []byte) bool {
+		lastUpstreamEvent = append(lastUpstreamEvent[:0], data...)
+		eventType := gjson.GetBytes(data, "type").String()
+
+		switch eventType {
+		case "response.output_text.delta":
+			if gjson.GetBytes(data, "delta").String() != "" {
+				hasContent = true
+			}
+		case "response.output_text.done":
+			if !hasContent && gjson.GetBytes(data, "text").String() != "" {
+				hasContent = true
+			}
+		case "response.content_part.done":
+			if !hasContent && gjson.GetBytes(data, "part.text").String() != "" {
+				hasContent = true
+			}
+		case "response.output_item.done":
+			if !hasContent && extractOutputItemText(gjson.GetBytes(data, "item")) != "" {
+				hasContent = true
+			}
+		case "response.completed":
+			gotTerminal = true
+			if status := gjson.GetBytes(data, "response.status").String(); status == "failed" || status == "incomplete" {
+				resultStatus, resultMessage = h.batchTestTerminalFailure(acc, resp, model, data, "上游返回 "+status)
+				return false
+			}
+			if !hasContent && extractCompletedOutputText(data) != "" {
+				hasContent = true
+			}
+			if !hasContent {
+				resultStatus = "failed"
+				resultMessage = formatNoOutputUpstreamError(data)
+				return false
+			}
+			resultStatus = "success"
+			resultMessage = "测试通过"
+			return false
+		case "response.failed":
+			gotTerminal = true
+			resultStatus, resultMessage = h.batchTestTerminalFailure(acc, resp, model, data, "上游返回 response.failed")
+			return false
+		case "error":
+			gotTerminal = true
+			resultStatus, resultMessage = h.batchTestTerminalFailure(acc, resp, model, data, "上游返回 error 事件")
+			return false
+		}
+		return true
+	})
+
+	if readErr != nil {
+		return h.handleBatchTestReadError(ctx, acc, readErr)
+	}
+	if resultStatus != "" {
+		return resultStatus, resultMessage
+	}
+	if !gotTerminal {
+		return "failed", formatMissingTerminalUpstreamError(lastUpstreamEvent)
+	}
+	return "failed", "上游测试未返回明确结果"
+}
+
+func (h *Handler) batchTestTerminalFailure(acc *auth.Account, resp *http.Response, model string, payload []byte, fallback string) (string, string) {
+	message := formatUpstreamTestError(payload, fallback)
+	if proxy.IsUsageLimitReachedError(payload) {
+		proxy.Apply429Cooldown(h.store, acc, payload, resp, model)
+		return "rate_limited", message
+	}
+	return "failed", message
+}
+
+func readBatchTestErrorBody(ctx context.Context, body io.Reader) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return io.ReadAll(io.LimitReader(body, 64<<10))
+}
+
+func (h *Handler) handleBatchTestReadError(ctx context.Context, acc *auth.Account, err error) (string, string) {
+	if msg, ok := batchTestContextFailure(ctx, err); ok {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			h.store.ReportRequestFailure(acc, "timeout", batchTestAccountTimeout)
+		}
+		return "failed", msg
+	}
+	h.store.MarkError(acc, "批量测试读取响应失败: "+err.Error())
+	return "failed", err.Error()
 }
 
 func batchTestContextFailure(ctx context.Context, err error) (string, bool) {

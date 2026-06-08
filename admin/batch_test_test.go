@@ -152,9 +152,10 @@ func TestRunSingleBatchTestTimesOutSlowStreamingBody(t *testing.T) {
 
 func TestRunSingleBatchTestSuccessRecoversBannedAccount(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"id":"resp_test","object":"response"}`))
+		_, _ = w.Write([]byte(`data: {"type":"response.output_text.delta","delta":"hello"}` + "\n\n"))
+		_, _ = w.Write([]byte(`data: {"type":"response.completed","response":{"status":"completed"}}` + "\n\n"))
 	}))
 	defer server.Close()
 
@@ -209,6 +210,71 @@ func TestRunSingleBatchTestSuccessRecoversBannedAccount(t *testing.T) {
 	}
 	if successStreak == 0 || lastSuccessAt.IsZero() {
 		t.Fatal("successful batch test should record scheduler success")
+	}
+}
+
+func TestRunSingleBatchTestResponseFailedDoesNotRecoverCooldown(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`data: {"type":"response.failed","response":{"error":{"message":"model unavailable","code":"model_not_available"}}}` + "\n\n"))
+	}))
+	defer server.Close()
+
+	store := auth.NewStore(nil, nil, nil)
+	account := &auth.Account{
+		DBID:           1,
+		UpstreamType:   auth.UpstreamOpenAIResponses,
+		BaseURL:        server.URL,
+		APIKey:         "test-key",
+		Models:         []string{"gpt-4o-mini"},
+		Status:         auth.StatusCooldown,
+		CooldownUtil:   time.Now().Add(time.Hour),
+		CooldownReason: "rate_limited",
+		HealthTier:     auth.HealthTierRisky,
+	}
+	store.AddAccount(account)
+	handler := &Handler{store: store}
+
+	status, msg := handler.runSingleBatchTest(context.Background(), account)
+	if status == "success" {
+		t.Fatalf("status = success, want failure for response.failed; message=%q", msg)
+	}
+	if !strings.Contains(msg, "model unavailable") {
+		t.Fatalf("message = %q, want upstream failure detail", msg)
+	}
+	if got := account.RuntimeStatus(); got != "rate_limited" {
+		t.Fatalf("RuntimeStatus() = %q, want rate_limited", got)
+	}
+}
+
+func TestRunSingleBatchTestUsageLimitResponseFailedMarksRateLimited(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`data: {"type":"response.failed","response":{"error":{"type":"usage_limit_reached","message":"usage limit reached","resets_in_seconds":3600}}}` + "\n\n"))
+	}))
+	defer server.Close()
+
+	store := auth.NewStore(nil, nil, nil)
+	account := &auth.Account{
+		DBID:         1,
+		UpstreamType: auth.UpstreamOpenAIResponses,
+		BaseURL:      server.URL,
+		APIKey:       "test-key",
+		Models:       []string{"gpt-4o-mini"},
+		Status:       auth.StatusReady,
+		HealthTier:   auth.HealthTierHealthy,
+	}
+	store.AddAccount(account)
+	handler := &Handler{store: store}
+
+	status, msg := handler.runSingleBatchTest(context.Background(), account)
+	if status != "rate_limited" {
+		t.Fatalf("status = %q, message = %q, want rate_limited", status, msg)
+	}
+	if got := account.RuntimeStatus(); got != "rate_limited" {
+		t.Fatalf("RuntimeStatus() = %q, want rate_limited", got)
 	}
 }
 
