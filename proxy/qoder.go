@@ -4,19 +4,15 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
-	"github.com/google/uuid"
 	"github.com/ttimasdf/qoder2api/auth"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -59,27 +55,32 @@ type qoderChooseModelResponse struct {
 }
 
 // signedQoderRequest 携带 Cosy 签名所需的全部输入。
+// qoderSignatureSalt 是 Cosy 签名固定盐，逆向自 qodercncli
+// addBigModelSignatureHeaders（见 docs/QODER_SIGNING.md）。这是一个 base64 文本
+// 字面量，按原文参与 MD5，不做解码。
+const (
+	qoderSignaturePrefix = "cosy"
+	qoderSignatureSalt   = "d2FyLCB3YXIgbmV2ZXIgY2hhbmdlcw=="
+	// qoderHTTPDateLayout 是签名所用 RFC1123 GMT 时间格式。
+	qoderHTTPDateLayout = "Mon, 02 Jan 2006 15:04:05 GMT"
+)
+
 type signedQoderRequest struct {
 	method  string
 	fullURL string
-	sigPath string // Cosy-SigPath：去掉 query 的请求路径
-	body    []byte // 实际发送的 body（可能已 base64 编码）
-	date    string // Cosy-Date：unix 毫秒
-	key     string // Cosy-Key：每请求 uuid
-	encode  bool   // message_encode == "1"
+	body    []byte // 请求体，原样发送（不参与签名）
+	date    string // Date 头：RFC1123 GMT，参与签名
+	cosyKey string // Cosy-Key
 }
 
-// buildQoderRequest 构造一个带 Cosy 签名头的 *http.Request。
+// buildQoderCosyRequest 构造一个带 Cosy 签名头的 *http.Request。
 //
-// 注意：签名摘要算法依据二进制中验证器打印的 "Signature Components (used for MD5)"
-// 复刻为：
+// 签名算法逆向自 qodercncli core/utils/qoder.addBigModelSignatureHeaders：
 //
-//	MD5( base64(payload) + Cosy-Key + Cosy-Date + body + Cosy-SigPath )
+//	date = time.Now().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
+//	Signature = hex(md5("cosy" + "d2FyLCB3YXIgbmV2ZXIgY2hhbmdlcw==" + date))
 //
-// 其中 message_encode=1 时 payload/ body 为 base64 编码后的请求体。
-// getAppSalt 派生的 body 加密尚未从静态分析中完全恢复（见 docs/QODER_PROTOCOL.md），
-// 当前实现按"仅 base64 编码、不二次加密"处理；接入真实账号联调时如返回签名错误，
-// 需要根据抓包补齐 salt。
+// 请求体不参与签名，原样发送（推理节点为 OpenAI 兼容 /chat/completions）。
 func buildQoderCosyRequest(ctx context.Context, account *auth.Account, method, rawURL string, rawBody []byte) (*http.Request, error) {
 	accessToken, userID, orgID, machineID, machineToken, clientVer := account.QoderCredentials()
 	if accessToken == "" {
@@ -89,30 +90,12 @@ func buildQoderCosyRequest(ctx context.Context, account *auth.Account, method, r
 		clientVer = QoderDefaultClientVersion
 	}
 
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, ErrInternalError("解析 Qoder URL 失败", err)
-	}
-
-	ep := auth.QoderEndpoints(QoderEdition)
-	encode := ep.MessageEncode == "1"
-
-	// payload：message_encode=1 时 body 用 base64 编码后发送。
-	payload := rawBody
-	if encode {
-		encoded := make([]byte, base64.StdEncoding.EncodedLen(len(rawBody)))
-		base64.StdEncoding.Encode(encoded, rawBody)
-		payload = encoded
-	}
-
 	sr := signedQoderRequest{
 		method:  method,
 		fullURL: rawURL,
-		sigPath: parsed.Path,
-		body:    payload,
-		date:    strconv.FormatInt(time.Now().UnixMilli(), 10),
-		key:     uuid.NewString(),
-		encode:  encode,
+		body:    rawBody,
+		date:    time.Now().UTC().Format(qoderHTTPDateLayout),
+		cosyKey: strconv.FormatInt(time.Now().UnixMilli(), 10),
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, bytes.NewReader(sr.body))
@@ -129,43 +112,36 @@ func applyQoderCosyHeaders(req *http.Request, sr signedQoderRequest, accessToken
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
 
+	// addBigModelAuthorizationHeaders
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Cosy-User", userID)
-	req.Header.Set("Cosy-Organization-Id", orgID)
-	req.Header.Set("Cosy-MachineId", machineID)
-	req.Header.Set("Cosy-MachineToken", machineToken)
+	req.Header.Set("Cosy-Key", sr.cosyKey)
+	req.Header.Set("Cosy-Date", strconv.FormatInt(time.Now().Unix(), 10))
+	// 设备/组织标识（IDE 守护进程一并发送；推理路径非必需但保持一致）
+	if orgID != "" {
+		req.Header.Set("Cosy-Organization-Id", orgID)
+	}
+	if machineID != "" {
+		req.Header.Set("Cosy-MachineId", machineID)
+	}
+	if machineToken != "" {
+		req.Header.Set("Cosy-MachineToken", machineToken)
+	}
 	req.Header.Set("Cosy-ClientType", QoderClientType)
 	req.Header.Set("Cosy-Version", clientVer)
-	req.Header.Set("Cosy-Date", sr.date)
-	req.Header.Set("Cosy-Key", sr.key)
-	req.Header.Set("Cosy-SigPath", sr.sigPath)
-	req.Header.Set("Cosy-BodyLength", strconv.Itoa(len(sr.body)))
 
-	bodyHash := md5.Sum(sr.body)
-	req.Header.Set("Cosy-BodyHash", hex.EncodeToString(bodyHash[:]))
-
-	req.Header.Set("X-Request-ID", uuid.NewString())
-
-	sig := computeQoderSignature(sr)
-	req.Header.Set("Cosy-Sign", sig)
+	// addBigModelSignatureHeaders
+	req.Header.Set("Date", sr.date)
+	req.Header.Set("Signature", computeQoderSignature(sr))
 }
 
-// computeQoderSignature 复刻 Cosy MD5 签名。
+// computeQoderSignature 复刻 Cosy 签名：
 //
-//	MD5( base64(payload) + Cosy-Key + Cosy-Date + body + Cosy-SigPath )
+//	hex(md5("cosy" + salt + date))
 //
-// 二进制中检查 body 的 isCompleteUTF8；此处保留该信号以便后续按需调整。
+// 其中 date 是 RFC1123 GMT 的 Date 头值。请求体不参与。
 func computeQoderSignature(sr signedQoderRequest) string {
-	var b strings.Builder
-	// payload 已在 buildQoderCosyRequest 中按需 base64；这里再次 base64 以匹配
-	// 验证器 "1. Payload (base64)" 的语义（对最终 body 再做 base64）。
-	b.WriteString(base64.StdEncoding.EncodeToString(sr.body))
-	b.WriteString(sr.key)
-	b.WriteString(sr.date)
-	b.Write(sr.body)
-	b.WriteString(sr.sigPath)
-	_ = utf8.Valid(sr.body) // isCompleteUTF8 占位
-	sum := md5.Sum([]byte(b.String()))
+	sum := md5.Sum([]byte(qoderSignaturePrefix + qoderSignatureSalt + sr.date))
 	return hex.EncodeToString(sum[:])
 }
 

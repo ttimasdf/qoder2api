@@ -3,7 +3,6 @@ package proxy
 import (
 	"context"
 	"crypto/md5"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -29,23 +28,10 @@ func newQoderTestAccount() *auth.Account {
 }
 
 func TestComputeQoderSignatureDeterministic(t *testing.T) {
-	sr := signedQoderRequest{
-		sigPath: "/algo/api/v2/service/invoke/choose_model",
-		body:    []byte(`{"model":"qwen3-coder"}`),
-		date:    "1700000000000",
-		key:     "fixed-key",
-	}
+	sr := signedQoderRequest{date: "Mon, 02 Jan 2006 15:04:05 GMT"}
 	got := computeQoderSignature(sr)
-
-	var b strings.Builder
-	b.WriteString(base64.StdEncoding.EncodeToString(sr.body))
-	b.WriteString(sr.key)
-	b.WriteString(sr.date)
-	b.Write(sr.body)
-	b.WriteString(sr.sigPath)
-	sum := md5.Sum([]byte(b.String()))
+	sum := md5.Sum([]byte("cosy" + "d2FyLCB3YXIgbmV2ZXIgY2hhbmdlcw==" + sr.date))
 	want := hex.EncodeToString(sum[:])
-
 	if got != want {
 		t.Fatalf("signature = %q, want %q", got, want)
 	}
@@ -58,7 +44,7 @@ func TestBuildQoderCosyRequestSetsHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildQoderCosyRequest: %v", err)
 	}
-	for _, h := range []string{"Authorization", "Cosy-User", "Cosy-MachineToken", "Cosy-Date", "Cosy-Key", "Cosy-SigPath", "Cosy-BodyHash", "Cosy-Sign", "X-Request-ID"} {
+	for _, h := range []string{"Authorization", "Cosy-User", "Cosy-Key", "Cosy-Date", "Date", "Signature"} {
 		if req.Header.Get(h) == "" {
 			t.Errorf("missing header %s", h)
 		}
@@ -66,8 +52,10 @@ func TestBuildQoderCosyRequestSetsHeaders(t *testing.T) {
 	if got := req.Header.Get("Authorization"); got != "Bearer at-test-token" {
 		t.Errorf("Authorization = %q", got)
 	}
-	if got := req.Header.Get("Cosy-SigPath"); got != "/algo/api/v2/service/invoke/choose_model" {
-		t.Errorf("Cosy-SigPath = %q (query should be trimmed)", got)
+	// Signature must equal md5(cosy+salt+Date)
+	sum := md5.Sum([]byte("cosy" + "d2FyLCB3YXIgbmV2ZXIgY2hhbmdlcw==" + req.Header.Get("Date")))
+	if got, want := req.Header.Get("Signature"), hex.EncodeToString(sum[:]); got != want {
+		t.Errorf("Signature = %q, want %q", got, want)
 	}
 }
 
@@ -95,8 +83,8 @@ func TestExecuteQoderRequestRoutesThroughChooseModel(t *testing.T) {
 		if !strings.HasSuffix(r.URL.Path, "/choose_model") {
 			t.Errorf("choose_model path = %s", r.URL.Path)
 		}
-		if r.Header.Get("Cosy-Sign") == "" {
-			t.Error("choose_model missing Cosy-Sign")
+		if r.Header.Get("Signature") == "" {
+			t.Error("choose_model missing Signature")
 		}
 		resp := qoderChooseModelResponse{ModelName: "qwen-max-routed", Endpoint: infer.URL, Token: "route-token"}
 		w.Header().Set("Content-Type", "application/json")

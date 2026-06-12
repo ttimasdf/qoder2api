@@ -40,3 +40,9 @@ sub2api/
 new-api/
 .gstack/
 frontend/dist/
+
+# Binary Ninja analysis DB (large; regenerate locally)
+docs/re/*.bndb
+docs/re/bn_*.log
+/bn_create.log
+/pi-re.jsonl
