@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/codex2api/api"
+	"github.com/ttimasdf/qoder2api/api"
 	"github.com/gin-gonic/gin"
 )
 

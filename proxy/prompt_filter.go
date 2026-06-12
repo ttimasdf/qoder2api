@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codex2api/api"
-	"github.com/codex2api/database"
-	"github.com/codex2api/security/promptfilter"
+	"github.com/ttimasdf/qoder2api/api"
+	"github.com/ttimasdf/qoder2api/database"
+	"github.com/ttimasdf/qoder2api/security/promptfilter"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )

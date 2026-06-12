@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codex2api/auth"
+	"github.com/ttimasdf/qoder2api/auth"
 )
 
 const (

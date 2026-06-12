@@ -3,9 +3,9 @@ package proxy
 import (
 	"testing"
 
-	"github.com/codex2api/auth"
-	"github.com/codex2api/config"
-	"github.com/codex2api/database"
+	"github.com/ttimasdf/qoder2api/auth"
+	"github.com/ttimasdf/qoder2api/config"
+	"github.com/ttimasdf/qoder2api/database"
 )
 
 func TestShouldUseWebsocketHonorsRuntimeForceWithoutStaticConfig(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/codex2api/auth"
+	"github.com/ttimasdf/qoder2api/auth"
 )
 
 type retryAccountExclusions struct {

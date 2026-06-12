@@ -17,9 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/codex2api/cache"
-	"github.com/codex2api/database"
-	"github.com/codex2api/security/promptfilter"
+	"github.com/ttimasdf/qoder2api/cache"
+	"github.com/ttimasdf/qoder2api/database"
+	"github.com/ttimasdf/qoder2api/security/promptfilter"
 )
 
 // AccountStatus 账号状态
@@ -42,6 +42,9 @@ const (
 )
 
 const UpstreamOpenAIResponses = "openai_responses"
+
+// UpstreamQoder 标识使用 Qoder / Qoder CN 上游（Cosy 签名协议）的账号。
+const UpstreamQoder = "qoder"
 
 // Account 运行时账号状态
 type Account struct {
@@ -124,6 +127,14 @@ type Account struct {
 	Tags                    []string
 	GroupIDs                []int64
 	ModelCooldowns          map[string]ModelCooldown
+
+	// Qoder (Cosy) 上游字段。仅当 UpstreamType == UpstreamQoder 时使用。
+	// 与 OpenAI/Codex 的 RT/AT 不同，Qoder 使用设备 OAuth + 机器令牌的 "Cosy" 签名协议。
+	QoderUserID       string // Cosy-User
+	QoderOrgID        string // Cosy-Organization-Id
+	QoderMachineID    string // Cosy-MachineId
+	QoderMachineToken string // Cosy-MachineToken
+	QoderClientVer    string // Cosy-Version（默认见 proxy.QoderDefaultClientVersion）
 
 	SubscriptionExpiresAt time.Time
 }
@@ -228,6 +239,31 @@ func (a *Account) IsOpenAIResponsesAPI() bool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.isOpenAIResponsesAPILocked()
+}
+
+// IsQoder 返回该账号是否使用 Qoder / Qoder CN 上游。
+func (a *Account) IsQoder() bool {
+	if a == nil {
+		return false
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return strings.EqualFold(strings.TrimSpace(a.UpstreamType), UpstreamQoder)
+}
+
+// QoderCredentials 在持锁下返回 Cosy 签名所需的凭据。
+func (a *Account) QoderCredentials() (accessToken, userID, orgID, machineID, machineToken, clientVer string) {
+	if a == nil {
+		return "", "", "", "", "", ""
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return strings.TrimSpace(a.AccessToken),
+		strings.TrimSpace(a.QoderUserID),
+		strings.TrimSpace(a.QoderOrgID),
+		strings.TrimSpace(a.QoderMachineID),
+		strings.TrimSpace(a.QoderMachineToken),
+		strings.TrimSpace(a.QoderClientVer)
 }
 
 func (a *Account) SupportsOpenAIResponsesModel(model string) bool {

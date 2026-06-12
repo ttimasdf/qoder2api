@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/codex2api/database"
+	"github.com/ttimasdf/qoder2api/database"
 	"github.com/gin-gonic/gin"
 )
 

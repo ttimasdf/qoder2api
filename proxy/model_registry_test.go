@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex2api/api"
-	"github.com/codex2api/database"
+	"github.com/ttimasdf/qoder2api/api"
+	"github.com/ttimasdf/qoder2api/database"
 )
 
 func newTestModelRegistryDB(t *testing.T) *database.DB {

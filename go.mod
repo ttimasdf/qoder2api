@@ -1,4 +1,4 @@
-module github.com/codex2api
+module github.com/ttimasdf/qoder2api
 
 go 1.26.4
 

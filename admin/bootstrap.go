@@ -11,10 +11,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/codex2api/database"
-	"github.com/codex2api/internal/imagestore"
-	"github.com/codex2api/proxy"
-	"github.com/codex2api/security"
+	"github.com/ttimasdf/qoder2api/database"
+	"github.com/ttimasdf/qoder2api/internal/imagestore"
+	"github.com/ttimasdf/qoder2api/proxy"
+	"github.com/ttimasdf/qoder2api/security"
 	"github.com/gin-gonic/gin"
 )
 

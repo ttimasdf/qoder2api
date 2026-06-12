@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/codex2api/auth"
-	"github.com/codex2api/proxy"
+	"github.com/ttimasdf/qoder2api/auth"
+	"github.com/ttimasdf/qoder2api/proxy"
 	"github.com/gin-gonic/gin"
 )
 

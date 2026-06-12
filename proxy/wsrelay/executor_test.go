@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex2api/proxy"
+	"github.com/ttimasdf/qoder2api/proxy"
 	"github.com/gorilla/websocket"
 	"github.com/tidwall/gjson"
 )

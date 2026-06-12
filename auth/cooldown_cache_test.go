@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex2api/cache"
+	"github.com/ttimasdf/qoder2api/cache"
 )
 
 func TestStoreSkipsCachedAccountCooldown(t *testing.T) {

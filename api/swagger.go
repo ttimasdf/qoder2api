@@ -7,7 +7,7 @@ package api
 // automatic rotation, usage tracking, and administrative management.
 //
 // @contact.name API Support
-// @contact.url https://github.com/codex2api
+// @contact.url https://github.com/ttimasdf/qoder2api
 // @contact.email support@codex2api.local
 //
 // @license.name MIT

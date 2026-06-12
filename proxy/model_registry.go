@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codex2api/database"
+	"github.com/ttimasdf/qoder2api/database"
 )
 
 const (

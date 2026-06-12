@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/codex2api/security"
+	"github.com/ttimasdf/qoder2api/security"
 )
 
 type ReasoningEffortModel struct {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codex2api/auth"
+	"github.com/ttimasdf/qoder2api/auth"
 	"github.com/tidwall/gjson"
 )
 

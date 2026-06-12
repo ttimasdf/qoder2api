@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex2api/cache"
+	"github.com/ttimasdf/qoder2api/cache"
 )
 
 func TestNextForSessionPrefersBoundAccountAndProxy(t *testing.T) {

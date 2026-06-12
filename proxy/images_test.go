@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex2api/auth"
-	"github.com/codex2api/database"
+	"github.com/ttimasdf/qoder2api/auth"
+	"github.com/ttimasdf/qoder2api/database"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )

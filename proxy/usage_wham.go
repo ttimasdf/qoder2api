@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codex2api/auth"
+	"github.com/ttimasdf/qoder2api/auth"
 )
 
 // WhamUsageURL 是 ChatGPT 后端用量查询端点。

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex2api/auth"
+	"github.com/ttimasdf/qoder2api/auth"
 )
 
 type resetRadarRoundTripFunc func(*http.Request) (*http.Response, error)

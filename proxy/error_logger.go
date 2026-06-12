@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codex2api/security"
+	"github.com/ttimasdf/qoder2api/security"
 )
 
 // fileLogger 单个日志文件实例

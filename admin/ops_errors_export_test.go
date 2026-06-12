@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex2api/database"
+	"github.com/ttimasdf/qoder2api/database"
 )
 
 func TestBuildOpsErrorExportFileDedupesAndExcludesStatuses(t *testing.T) {

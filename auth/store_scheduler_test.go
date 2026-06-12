@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codex2api/cache"
-	"github.com/codex2api/database"
+	"github.com/ttimasdf/qoder2api/cache"
+	"github.com/ttimasdf/qoder2api/database"
 )
 
 func int64Ptr(v int64) *int64 {

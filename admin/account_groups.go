@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/codex2api/database"
+	"github.com/ttimasdf/qoder2api/database"
 	"github.com/gin-gonic/gin"
 )
 

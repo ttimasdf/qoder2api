@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codex2api/cache"
+	"github.com/ttimasdf/qoder2api/cache"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
