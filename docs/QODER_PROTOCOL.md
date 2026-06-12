@@ -40,6 +40,20 @@ Device OAuth2 + machine token, NOT OpenAI-style RT/AT.
 
 ## Request signing ("Cosy" scheme)
 
+> **Superseded / corrected:** the section below describes the IDE daemon
+> (`QoderCN`, `cosy/remoting`) headers as first observed from strings. The
+> **authoritative, statically-verified** signing algorithm (from the standalone
+> `qodercncli`) is in **[QODER_SIGNING.md](QODER_SIGNING.md)** and is what the
+> fork implements:
+>
+> ```
+> date      = time.Now().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
+> Signature = hex(md5("cosy" + "d2FyLCB3YXIgbmV2ZXIgY2hhbmdlcw==" + date))
+> ```
+>
+> The body, request path, and a body hash do NOT participate. Header name is
+> `Signature`. `Cosy-Date` is unix seconds; the signed `Date` is RFC1123 GMT.
+
 `cosy/remoting.buildRequest` -> `addBasicHeaders` + `addBigModelSignatureHeaders`
 + `addBigModelAuthorizationHeaders`.
 
