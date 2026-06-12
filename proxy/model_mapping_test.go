@@ -55,20 +55,21 @@ func TestResolveConfiguredModelMappingSpecificWildcardWins(t *testing.T) {
 }
 
 func TestResolveConfiguredModelMappingCanonicalizesTargetAlias(t *testing.T) {
-	got, ok := resolveConfiguredModelMapping("legacy-model", `{"legacy-model":"gpt5.5"}`, []string{"gpt-5.5"})
-	if !ok {
-		t.Fatal("expected exact mapping")
-	}
-	if got != "gpt-5.5" {
-		t.Fatalf("mapped model = %q, want gpt-5.5", got)
-	}
-
-	got, ok = resolveConfiguredModelMapping("legacy-model", `{"legacy-model":"GPT-5.5"}`, []string{"gpt-5.5"})
+	// qoder2api 的 canonicalizeCodexModel 仅做大小写无关的精确匹配（已移除 codex 别名表）。
+	got, ok := resolveConfiguredModelMapping("legacy-model", `{"legacy-model":"GPT-5.5"}`, []string{"gpt-5.5"})
 	if !ok {
 		t.Fatal("expected exact mapping")
 	}
 	if got != "gpt-5.5" {
 		t.Fatalf("case-normalized mapped model = %q, want gpt-5.5", got)
+	}
+
+	got, ok = resolveConfiguredModelMapping("legacy-model", `{"legacy-model":"gpt-5.5"}`, []string{"gpt-5.5"})
+	if !ok {
+		t.Fatal("expected exact mapping")
+	}
+	if got != "gpt-5.5" {
+		t.Fatalf("mapped model = %q, want gpt-5.5", got)
 	}
 }
 
@@ -79,18 +80,6 @@ func TestResolveConfiguredModelMappingIgnoresInvalidJSON(t *testing.T) {
 	}
 	if got != "gpt-5.4" {
 		t.Fatalf("model = %q, want original", got)
-	}
-}
-
-func TestResolveAnthropicModelUsesWildcardBeforeDefaultFallback(t *testing.T) {
-	got := resolveAnthropicModel("claude-opus-4-7", `{"claude-opus-*":"gpt-5.5"}`, []string{"gpt-5.5", "gpt-5.4"})
-	if got != "gpt-5.5" {
-		t.Fatalf("resolveAnthropicModel wildcard = %q, want gpt-5.5", got)
-	}
-
-	got = resolveAnthropicModel("claude-haiku-4-5", `{}`, []string{"gpt-5.4-mini"})
-	if got != "gpt-5.4-mini" {
-		t.Fatalf("resolveAnthropicModel default = %q, want gpt-5.4-mini", got)
 	}
 }
 

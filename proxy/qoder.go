@@ -60,13 +60,13 @@ type qoderChooseModelResponse struct {
 
 // signedQoderRequest 携带 Cosy 签名所需的全部输入。
 type signedQoderRequest struct {
-	method   string
-	fullURL  string
-	sigPath  string // Cosy-SigPath：去掉 query 的请求路径
-	body     []byte // 实际发送的 body（可能已 base64 编码）
-	date     string // Cosy-Date：unix 毫秒
-	key      string // Cosy-Key：每请求 uuid
-	encode   bool   // message_encode == "1"
+	method  string
+	fullURL string
+	sigPath string // Cosy-SigPath：去掉 query 的请求路径
+	body    []byte // 实际发送的 body（可能已 base64 编码）
+	date    string // Cosy-Date：unix 毫秒
+	key     string // Cosy-Key：每请求 uuid
+	encode  bool   // message_encode == "1"
 }
 
 // buildQoderRequest 构造一个带 Cosy 签名头的 *http.Request。

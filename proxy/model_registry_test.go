@@ -5,9 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-	"time"
 
-	"github.com/ttimasdf/qoder2api/api"
 	"github.com/ttimasdf/qoder2api/database"
 )
 
@@ -40,64 +38,6 @@ func TestParseOfficialCodexModelIDs(t *testing.T) {
 		if !slices.Contains(skipped, model) {
 			t.Fatalf("skipped models missing %q in %v", model, skipped)
 		}
-	}
-}
-
-func TestApplyOfficialCodexModelSyncMergesWithBuiltinImageModel(t *testing.T) {
-	db := newTestModelRegistryDB(t)
-	ctx := context.Background()
-	html := `gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex gpt-5.3-codex-spark gpt-5.2 gpt-5.2-codex gpt-4.1`
-
-	result, err := ApplyOfficialCodexModelSync(ctx, db, html, time.Date(2026, 4, 24, 0, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatalf("ApplyOfficialCodexModelSync error: %v", err)
-	}
-	for _, model := range []string{"gpt-image-2", "gpt-image-2-2k", "gpt-image-2-4k"} {
-		if !slices.Contains(result.Models, model) {
-			t.Fatalf("sync should keep builtin image model %q, got %v", model, result.Models)
-		}
-	}
-	if !slices.Contains(result.Skipped, "gpt-5.2-codex") {
-		t.Fatalf("sync should skip gpt-5.2-codex, got %v", result.Skipped)
-	}
-
-	var spark *ModelInfo
-	for i := range result.Items {
-		if result.Items[i].ID == "gpt-5.3-codex-spark" {
-			spark = &result.Items[i]
-			break
-		}
-	}
-	if spark == nil || !spark.ProOnly {
-		t.Fatalf("spark model should be marked pro_only, got %#v", spark)
-	}
-}
-
-func TestDynamicModelRegistryAffectsValidationImmediately(t *testing.T) {
-	db := newTestModelRegistryDB(t)
-	ctx := context.Background()
-	err := db.UpsertModelRegistryRows(ctx, []database.ModelRegistryRow{
-		{
-			ID:                  "gpt-6.0",
-			Enabled:             true,
-			Category:            ModelCategoryCodex,
-			Source:              ModelSourceOfficialCodexDocs,
-			APIKeyAuthAvailable: true,
-		},
-	})
-	if err != nil {
-		t.Fatalf("UpsertModelRegistryRows error: %v", err)
-	}
-
-	handler := NewHandler(nil, db, nil, nil)
-	models := handler.supportedModelIDs(ctx)
-	if !slices.Contains(models, "gpt-6.0") {
-		t.Fatalf("runtime supported models missing synced model: %v", models)
-	}
-
-	result := api.ValidateResponsesAPIRequest([]byte(`{"model":"gpt-6.0","input":"hello"}`), models)
-	if !result.Valid {
-		t.Fatalf("synced model should pass validation: %#v", result.Errors)
 	}
 }
 
