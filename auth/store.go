@@ -2797,6 +2797,17 @@ func (s *Store) buildAccountFromRow(ctx context.Context, row *database.AccountRo
 			account.SubscriptionExpiresAt = parsed
 		}
 	}
+	// Qoder (Cosy) 上游凭据恢复。
+	if strings.EqualFold(strings.TrimSpace(upstreamType), UpstreamQoder) {
+		account.QoderUserID = row.GetCredential("qoder_user_id")
+		account.QoderOrgID = row.GetCredential("qoder_org_id")
+		account.QoderMachineID = row.GetCredential("qoder_machine_id")
+		account.QoderMachineToken = row.GetCredential("qoder_machine_token")
+		account.QoderClientVer = row.GetCredential("qoder_client_version")
+		if account.AccessToken != "" && account.Status != StatusError {
+			account.HealthTier = HealthTierHealthy
+		}
+	}
 	if row.CooldownUntil.Valid {
 		if time.Now().Before(row.CooldownUntil.Time) {
 			account.SetCooldownUntil(row.CooldownUntil.Time, row.CooldownReason)
