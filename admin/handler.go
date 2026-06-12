@@ -265,7 +265,6 @@ func (h *Handler) SetPoolSizes(pgMaxConns, redisPoolSize int) {
 
 // RegisterRoutes 注册管理 API 路由
 func (h *Handler) RegisterRoutes(r *gin.Engine) {
-	r.GET("/p/img/:id", h.GetSignedImageAssetFile)
 	r.GET("/p/backgrounds/:filename", h.GetBackgroundAssetFile)
 	r.HEAD("/p/backgrounds/:filename", h.GetBackgroundAssetFile)
 	r.GET("/api/branding", h.GetBranding)
@@ -345,18 +344,6 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	api.GET("/prompt-filter/rules", h.GetPromptFilterRules)
 	api.GET("/models", h.ListModels)
 	api.POST("/models/sync", h.SyncModels)
-	api.GET("/image-prompts", h.ListImagePromptTemplates)
-	api.POST("/image-prompts", h.CreateImagePromptTemplate)
-	api.PATCH("/image-prompts/:id", h.UpdateImagePromptTemplate)
-	api.DELETE("/image-prompts/:id", h.DeleteImagePromptTemplate)
-	api.POST("/images/jobs", h.CreateImageGenerationJob)
-	api.POST("/images/edit-jobs", h.CreateImageEditJob)
-	api.GET("/images/jobs", h.ListImageGenerationJobs)
-	api.GET("/images/jobs/:id", h.GetImageGenerationJob)
-	api.DELETE("/images/jobs/:id", h.DeleteImageGenerationJob)
-	api.GET("/images/assets", h.ListImageAssets)
-	api.GET("/images/assets/:id/file", h.GetImageAssetFile)
-	api.DELETE("/images/assets/:id", h.DeleteImageAsset)
 	api.GET("/proxies", h.ListProxies)
 	api.POST("/proxies", h.AddProxies)
 	api.DELETE("/proxies/:id", h.DeleteProxy)
