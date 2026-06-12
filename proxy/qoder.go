@@ -169,10 +169,16 @@ func computeQoderSignature(sr signedQoderRequest) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// qoderBigModelBaseOverride 仅用于测试：非空时覆盖 big-model 基址。
+var qoderBigModelBaseOverride string
+
 // qoderBigModelURL 拼接 big-model 端点 + path（+ ?Encode=1）。
 func qoderBigModelURL(path string, encode bool) string {
-	ep := auth.QoderEndpoints(QoderEdition)
-	base := strings.TrimRight(ep.BigModel, "/")
+	base := strings.TrimRight(qoderBigModelBaseOverride, "/")
+	if base == "" {
+		ep := auth.QoderEndpoints(QoderEdition)
+		base = strings.TrimRight(ep.BigModel, "/")
+	}
 	u := base + path
 	if encode {
 		u += "?Encode=1"
