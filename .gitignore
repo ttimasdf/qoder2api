@@ -39,3 +39,4 @@ CLIProxyAPI/
 sub2api/
 new-api/
 .gstack/
+frontend/dist/

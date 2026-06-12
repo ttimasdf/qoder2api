@@ -21,7 +21,6 @@ import (
 	"github.com/ttimasdf/qoder2api/database"
 	"github.com/ttimasdf/qoder2api/internal/imagestore"
 	"github.com/ttimasdf/qoder2api/proxy"
-	"github.com/ttimasdf/qoder2api/proxy/wsrelay"
 	"github.com/ttimasdf/qoder2api/security"
 	"github.com/gin-gonic/gin"
 )
@@ -272,17 +271,6 @@ func main() {
 	handler := proxy.NewHandler(store, db, cfg, deviceCfg)
 	handler.SetRuntimeCache(tc)
 
-	// 注册 WebSocket 执行函数（避免 proxy ↔ wsrelay 循环依赖）
-	proxy.WebsocketExecuteFunc = wsrelay.ExecuteRequestWebsocket
-
-	// 上游 WS 空闲连接保活常驻任务（默认关闭：goroutine 常驻但仅在运行时开关开启时才发送 Ping）
-	wsKeepalive := wsrelay.NewKeepaliveTask(
-		wsrelay.GetManager(),
-		store.CodexWSKeepaliveEnabled,
-		store.CodexWSKeepaliveIntervalSec,
-	)
-	wsKeepalive.Start()
-
 	r.Use(rateLimiter.Middleware())
 	if settings.GlobalRPM > 0 {
 		log.Printf("全局限流已生效: %d RPM", settings.GlobalRPM)
@@ -386,9 +374,7 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("HTTP 服务优雅关闭超时: %v", err)
 	}
-	wsKeepalive.Stop()
 	store.Stop()
-	wsrelay.ShutdownExecutor()
 	proxy.CloseErrorLogger()
 	log.Println("已关闭")
 }

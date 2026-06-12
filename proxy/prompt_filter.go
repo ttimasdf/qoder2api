@@ -55,23 +55,6 @@ func (h *Handler) inspectPromptFilterTextOpenAI(c *gin.Context, text string, end
 	return true
 }
 
-func (h *Handler) inspectPromptFilterAnthropic(c *gin.Context, rawBody []byte, endpoint string, model string) bool {
-	if h == nil || h.store == nil {
-		return false
-	}
-	cfg := h.store.GetPromptFilterConfig()
-	verdict := promptfilter.Inspect(rawBody, endpoint, cfg)
-	h.logPromptFilterVerdict(c, endpoint, model, "local_filter", "", verdict)
-	if verdict.Action == promptfilter.ActionWarn {
-		c.Header("X-Prompt-Filter-Warning", verdict.Reason)
-	}
-	if verdict.Action == promptfilter.ActionBlock {
-		sendAnthropicError(c, http.StatusBadRequest, "invalid_request_error", "Request contains content blocked by prompt filter")
-		return true
-	}
-	return false
-}
-
 func (h *Handler) logPromptFilterVerdict(c *gin.Context, endpoint string, model string, source string, errorCode string, verdict promptfilter.Verdict) {
 	if h == nil || h.db == nil || !verdict.Enabled {
 		return
