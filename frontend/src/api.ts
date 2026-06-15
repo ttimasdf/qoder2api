@@ -14,14 +14,7 @@ import type {
   CreateAPIKeyRequest,
   FetchOpenAIResponsesModelsRequest,
   FetchOpenAIResponsesModelsResponse,
-  CreateImageJobPayload,
   HealthResponse,
-  ImageAssetsResponse,
-  ImagePromptTemplate,
-  ImageJobResponse,
-  ImageJobsResponse,
-  ImagePromptTemplatePayload,
-  ImagePromptTemplatesResponse,
   MessageResponse,
   ModelSyncResponse,
   ModelsResponse,
@@ -365,52 +358,6 @@ export const api = {
     request<MessageResponse>(`/keys/${id}`, { method: 'DELETE' }),
   updateAPIKey: (id: number, data: UpdateAPIKeyRequest) =>
     request<MessageResponse>(`/keys/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  getImagePromptTemplates: (params: { q?: string; tag?: string } = {}) => {
-    const sp = new URLSearchParams()
-    if (params.q) sp.set('q', params.q)
-    if (params.tag) sp.set('tag', params.tag)
-    const query = sp.toString()
-    return request<ImagePromptTemplatesResponse>(`/image-prompts${query ? `?${query}` : ''}`)
-  },
-  createImagePromptTemplate: (data: ImagePromptTemplatePayload) =>
-    request<{ template: ImagePromptTemplate }>('/image-prompts', { method: 'POST', body: JSON.stringify(data) }),
-  updateImagePromptTemplate: (id: number, data: ImagePromptTemplatePayload) =>
-    request<{ template: ImagePromptTemplate }>(`/image-prompts/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteImagePromptTemplate: (id: number) =>
-    request<MessageResponse>(`/image-prompts/${id}`, { method: 'DELETE' }),
-  createImageJob: (data: CreateImageJobPayload) =>
-    request<ImageJobResponse>('/images/jobs', { method: 'POST', body: JSON.stringify(data) }),
-  createImageEditJob: (data: CreateImageJobPayload) =>
-    request<ImageJobResponse>('/images/edit-jobs', { method: 'POST', body: JSON.stringify(data) }),
-  getImageJobs: (params: { page?: number; pageSize?: number } = {}) => {
-    const sp = new URLSearchParams()
-    if (params.page) sp.set('page', String(params.page))
-    if (params.pageSize) sp.set('page_size', String(params.pageSize))
-    return request<ImageJobsResponse>(`/images/jobs?${sp.toString()}`)
-  },
-  getImageJob: (id: number, params: { includeCache?: boolean } = {}) => {
-    const sp = new URLSearchParams()
-    if (params.includeCache) sp.set('include_cache', '1')
-    const query = sp.toString()
-    return request<ImageJobResponse>(`/images/jobs/${id}${query ? `?${query}` : ''}`)
-  },
-  deleteImageJob: (id: number) =>
-    request<MessageResponse>(`/images/jobs/${id}`, { method: 'DELETE' }),
-  getImageAssets: (params: { page?: number; pageSize?: number } = {}) => {
-    const sp = new URLSearchParams()
-    if (params.page) sp.set('page', String(params.page))
-    if (params.pageSize) sp.set('page_size', String(params.pageSize))
-    return request<ImageAssetsResponse>(`/images/assets?${sp.toString()}`)
-  },
-  getImageAssetFile: (id: number, download = false, thumbKB = 0) => {
-    const sp = new URLSearchParams()
-    if (download) sp.set('download', '1')
-    if (thumbKB > 0) sp.set('thumb_kb', String(thumbKB))
-    const query = sp.toString()
-    return requestBlob(`/images/assets/${id}/file${query ? `?${query}` : ''}`)
-  },
-  deleteImageAsset: (id: number) =>
-    request<MessageResponse>(`/images/assets/${id}`, { method: 'DELETE' }),
   clearUsageLogs: () =>
     request<MessageResponse>('/usage/logs', { method: 'DELETE' }),
   getSetupHints: () => request<SetupHintsResponse>('/setup-hints'),

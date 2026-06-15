@@ -20,7 +20,6 @@ const Docs = lazy(() => import('./pages/Docs'))
 const APIKeys = lazy(() => import('./pages/APIKeys'))
 const Usage = lazy(() => import('./pages/Usage'))
 const Subscriptions = lazy(() => import('./pages/Subscriptions'))
-const ImageStudio = lazy(() => import('./pages/ImageStudio'))
 const PromptFilter = lazy(() => import('./pages/PromptFilter'))
 const ThemeSettings = lazy(() => import('./pages/ThemeSettings'))
 
@@ -38,8 +37,6 @@ export default function App() {
                     <Route path="/accounts" element={<Accounts />} />
                     <Route path="/api-keys" element={<APIKeys />} />
                     <Route path="/proxies" element={<Proxies />} />
-                    <Route path="/images" element={<Navigate to="/images/studio" replace />} />
-                    <Route path="/images/:view" element={<ImageStudio />} />
                     <Route path="/prompt-filter" element={<Navigate to="/prompt-filter/overview" replace />} />
                     <Route path="/prompt-filter/:view" element={<PromptFilter />} />
                     <Route path="/ops" element={<Navigate to="/ops/overview" replace />} />
