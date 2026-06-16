@@ -266,6 +266,16 @@ func (a *Account) QoderCredentials() (accessToken, userID, orgID, machineID, mac
 		strings.TrimSpace(a.QoderClientVer)
 }
 
+// QoderBaseURL 返回账号级 Qoder base_url 覆盖值；空值表示使用版本默认端点。
+func (a *Account) QoderBaseURL() string {
+	if a == nil {
+		return ""
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return strings.TrimRight(strings.TrimSpace(a.BaseURL), "/")
+}
+
 func (a *Account) SupportsOpenAIResponsesModel(model string) bool {
 	if a == nil {
 		return false
@@ -1708,8 +1718,8 @@ type Store struct {
 	sessionMu             sync.RWMutex
 	sessionBindings       map[string]sessionAffinity
 
-	globalAutoPause5hThreshold float64 // protected by mu
-	globalAutoPause7dThreshold float64 // protected by mu
+	globalAutoPause5hThreshold float64  // protected by mu
+	globalAutoPause7dThreshold float64  // protected by mu
 	groupAutoPauseThresholds   sync.Map // int64 -> [2]float64 {5h, 7d}
 }
 
@@ -2799,6 +2809,9 @@ func (s *Store) buildAccountFromRow(ctx context.Context, row *database.AccountRo
 	}
 	// Qoder (Cosy) 上游凭据恢复。
 	if strings.EqualFold(strings.TrimSpace(upstreamType), UpstreamQoder) {
+		if qoderBaseURL := strings.TrimSpace(row.GetCredential("qoder_base_url")); qoderBaseURL != "" {
+			account.BaseURL = strings.TrimRight(qoderBaseURL, "/")
+		}
 		account.QoderUserID = row.GetCredential("qoder_user_id")
 		account.QoderOrgID = row.GetCredential("qoder_org_id")
 		account.QoderMachineID = row.GetCredential("qoder_machine_id")
@@ -4255,6 +4268,17 @@ func (s *Store) ApplyAccountProxyURL(dbID int64, proxyURL string) bool {
 	}
 	acc.mu.Lock()
 	acc.ProxyURL = strings.TrimSpace(proxyURL)
+	acc.mu.Unlock()
+	return true
+}
+
+func (s *Store) ApplyAccountBaseURL(dbID int64, baseURL string) bool {
+	acc := s.FindByID(dbID)
+	if acc == nil {
+		return false
+	}
+	acc.mu.Lock()
+	acc.BaseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	acc.mu.Unlock()
 	return true
 }

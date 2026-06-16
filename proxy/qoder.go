@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ttimasdf/qoder2api/auth"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	"github.com/ttimasdf/qoder2api/auth"
 )
 
 // ============================================================================
@@ -148,11 +148,20 @@ func computeQoderSignature(sr signedQoderRequest) string {
 // qoderBigModelBaseOverride 仅用于测试：非空时覆盖 big-model 基址。
 var qoderBigModelBaseOverride string
 
+// qoderEndpointSet 返回账号级 base_url 覆盖后的 Qoder 端点集合。
+func qoderEndpointSet(account *auth.Account) auth.QoderEndpointSet {
+	baseURL := ""
+	if account != nil {
+		baseURL = account.QoderBaseURL()
+	}
+	return auth.QoderEndpointsWithBaseURL(QoderEdition, baseURL)
+}
+
 // qoderBigModelURL 拼接 big-model 端点 + path（+ ?Encode=1）。
-func qoderBigModelURL(path string, encode bool) string {
+func qoderBigModelURL(account *auth.Account, path string, encode bool) string {
 	base := strings.TrimRight(qoderBigModelBaseOverride, "/")
 	if base == "" {
-		ep := auth.QoderEndpoints(QoderEdition)
+		ep := qoderEndpointSet(account)
 		base = strings.TrimRight(ep.BigModel, "/")
 	}
 	u := base + path
@@ -197,7 +206,7 @@ func ExecuteQoderRequest(ctx context.Context, account *auth.Account, requestBody
 
 	inferBase := strings.TrimRight(route.Endpoint, "/")
 	if inferBase == "" {
-		inferBase = strings.TrimRight(auth.QoderEndpoints(QoderEdition).Infer, "/")
+		inferBase = strings.TrimRight(qoderEndpointSet(account).Infer, "/")
 	}
 	endpoint := inferBase + "/chat/completions"
 
@@ -230,11 +239,11 @@ func ExecuteQoderRequest(ctx context.Context, account *auth.Account, requestBody
 
 // qoderChooseModel 调用 choose_model 路由接口。
 func qoderChooseModel(ctx context.Context, account *auth.Account, model, proxyURL string) (*qoderChooseModelResponse, error) {
-	ep := auth.QoderEndpoints(QoderEdition)
+	ep := qoderEndpointSet(account)
 	encode := ep.MessageEncode == "1"
 
 	reqPayload, _ := json.Marshal(map[string]any{"model": model})
-	rawURL := qoderBigModelURL(qoderChooseModelPath, encode)
+	rawURL := qoderBigModelURL(account, qoderChooseModelPath, encode)
 
 	req, err := buildQoderCosyRequest(ctx, account, http.MethodPost, rawURL, reqPayload)
 	if err != nil {
@@ -275,9 +284,9 @@ func ListQoderModels(ctx context.Context, account *auth.Account, proxyURL string
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ep := auth.QoderEndpoints(QoderEdition)
+	ep := qoderEndpointSet(account)
 	encode := ep.MessageEncode == "1"
-	rawURL := qoderBigModelURL(qoderModelListPath, encode)
+	rawURL := qoderBigModelURL(account, qoderModelListPath, encode)
 	req, err := buildQoderCosyRequest(ctx, account, http.MethodGet, rawURL, []byte("{}"))
 	if err != nil {
 		return nil, err

@@ -29,7 +29,7 @@ details (endpoints, Cosy signing, choose_model flow, editions).
 | `intl` (qoder.com) | `https://center.qoder.sh/algo` | `https://www.qoder.com/device/selectAccounts` |
 | `cn` (default) | `https://qoder.com.cn` | `https://devops.aliyun.com/lingma/login` |
 
-Select via `proxy.QoderEdition` (default `cn`).
+Select via `proxy.QoderEdition` (default `cn`). For Qoder accounts, set the account credential `base_url` (or `qoder_base_url` on import/add requests) to override the CN base URL per account.
 
 ## Build & test
 

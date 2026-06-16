@@ -25,6 +25,7 @@ type tokenCredentialSeed struct {
 	codex5HUsedPercent    string
 	codex5HResetAt        string
 	codexUsageUpdatedAt   string
+	baseURL               string
 }
 
 func normalizeTokenCredentialSeed(seed tokenCredentialSeed) tokenCredentialSeed {
@@ -41,6 +42,7 @@ func normalizeTokenCredentialSeed(seed tokenCredentialSeed) tokenCredentialSeed 
 	seed.codex5HUsedPercent = strings.TrimSpace(seed.codex5HUsedPercent)
 	seed.codex5HResetAt = strings.TrimSpace(seed.codex5HResetAt)
 	seed.codexUsageUpdatedAt = strings.TrimSpace(seed.codexUsageUpdatedAt)
+	seed.baseURL = strings.TrimRight(strings.TrimSpace(seed.baseURL), "/")
 
 	if info := accountInfoFromTokens(seed.idToken, seed.accessToken); info != nil {
 		if seed.accountID == "" {
@@ -142,6 +144,9 @@ func tokenCredentialMap(seed tokenCredentialSeed) map[string]interface{} {
 	if seed.codexUsageUpdatedAt != "" {
 		credentials["codex_usage_updated_at"] = seed.codexUsageUpdatedAt
 	}
+	if seed.baseURL != "" {
+		credentials["base_url"] = seed.baseURL
+	}
 	return credentials
 }
 
@@ -157,6 +162,7 @@ func accountFromCredentialSeed(id int64, proxyURL string, seed tokenCredentialSe
 		Email:                 seed.email,
 		PlanType:              seed.planType,
 		ProxyURL:              proxyURL,
+		BaseURL:               seed.baseURL,
 		Status:                auth.StatusReady,
 		SubscriptionExpiresAt: seed.subscriptionExpiresAt,
 	}

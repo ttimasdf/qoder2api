@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -18,10 +19,11 @@ import (
 const (
 	// QoderEditionIntl 国际版（qoder.sh / qoder.com）。
 	QoderEditionIntl = "intl"
-	// QoderEditionCN 中国版（Aliyun RDC anquan-cn-beijing）。
+	// QoderEditionCN 中国版。
 	QoderEditionCN = "cn"
 
 	qoderDefaultClientVersion = "2.6.0"
+	qoderCNDefaultBaseURL     = "https://qoder.com.cn"
 )
 
 // QoderEndpointSet 描述一个 Qoder 版本的服务端点。
@@ -43,9 +45,9 @@ func QoderEndpoints(edition string) QoderEndpointSet {
 	switch strings.ToLower(strings.TrimSpace(edition)) {
 	case QoderEditionCN:
 		return QoderEndpointSet{
-			BigModel:      "https://qoder.com.cn",
-			Infer:         "https://qoder.com.cn",
-			OpenAPI:       "https://qoder.com.cn",
+			BigModel:      qoderCNDefaultBaseURL,
+			Infer:         qoderCNDefaultBaseURL,
+			OpenAPI:       qoderCNDefaultBaseURL,
 			LoginURL:      "https://devops.aliyun.com/lingma/login",
 			MessageEncode: "1",
 		}
@@ -59,6 +61,42 @@ func QoderEndpoints(edition string) QoderEndpointSet {
 		}
 	}
 }
+
+// QoderEndpointsWithBaseURL 返回端点集合，并用账号级 base_url 覆盖 BigModel/Infer/OpenAPI。
+func QoderEndpointsWithBaseURL(edition, baseURL string) QoderEndpointSet {
+	ep := QoderEndpoints(edition)
+	base, err := NormalizeQoderBaseURL(baseURL)
+	if err == nil && base != "" {
+		ep.BigModel = base
+		ep.Infer = base
+		ep.OpenAPI = base
+	}
+	return ep
+}
+
+// NormalizeQoderBaseURL 规范化账号级 Qoder base_url。空值表示使用版本默认值。
+func NormalizeQoderBaseURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("qoder base_url 必须是完整的 http/https URL")
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "http", "https":
+	default:
+		return "", fmt.Errorf("qoder base_url 仅支持 http/https")
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	parsed.Path = strings.TrimRight(parsed.Path, "/")
+	return parsed.String(), nil
+}
+
+// QoderDefaultCNBaseURL 返回内置 CN 端点；账号级 base_url 可覆盖它。
+func QoderDefaultCNBaseURL() string { return qoderCNDefaultBaseURL }
 
 // QoderTokenData 保存一次刷新得到的 Qoder 令牌。
 type QoderTokenData struct {

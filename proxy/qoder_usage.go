@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ttimasdf/qoder2api/auth"
 	"github.com/tidwall/gjson"
+	"github.com/ttimasdf/qoder2api/auth"
 )
 
 // ============================================================================
@@ -54,9 +54,9 @@ func QueryWhamUsage(ctx context.Context, account *auth.Account, proxyURL string)
 		ctx = context.Background()
 	}
 
-	ep := auth.QoderEndpoints(QoderEdition)
+	ep := qoderEndpointSet(account)
 	encode := ep.MessageEncode == "1"
-	rawURL := qoderBigModelURL(qoderUserPlanPath, encode)
+	rawURL := qoderBigModelURL(account, qoderUserPlanPath, encode)
 
 	req, err := buildQoderCosyRequest(ctx, account, http.MethodGet, rawURL, []byte("{}"))
 	if err != nil {
